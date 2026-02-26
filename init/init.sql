@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS transferevents (
+    event_id VARCHAR(100) PRIMARY KEY,
+    station_id VARCHAR(100) NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    status VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

@@ -1,79 +1,29 @@
-require('dotenv').config();
 const DatabaseInterface = require("./DatabaseInterface");
 
 const { Pool } = require('pg');
 
 class PostgresqlDB extends DatabaseInterface {
-    constructor(tableName = 'TransferEvents') {
+    constructor(tableName = "transferevents") {
         super();
         this.pool = null;
         this.tableName = tableName;
     }
 
-    async createDatabase(dbName) {
-        try {
-            const adminPool = new Pool({
-                host: process.env.DB_HOST,
-                port: process.env.DB_PORT,
-                user: process.env.DB_USER,
-                password: process.env.DB_PASSWORD,
-                database: 'postgres',
-            });
-
-            await adminPool.query(`CREATE DATABASE "${dbName}"`);
-            console.log(`Database '${dbName}' created successfully`);
-            await adminPool.end();
-            return true;
-        } catch (err) {
-            if (err.message.includes('already exists')) {
-                console.log(`Database '${dbName}' already exists`);
-                return true;
-            }
-            console.error('Failed to create database:', err.message);
-            return false;
-        }
-    }
-
     async connect() {
         try {
+            const connectionString = process.env.DATABASE_URL
+
             this.pool = new Pool({
-                host: process.env.DB_HOST,
-                port: process.env.DB_PORT,
-                user: process.env.DB_USER,
-                password: process.env.DB_PASSWORD,
-                database: process.env.DB_NAME,
+            connectionString,
             });
 
             const client = await this.pool.connect();
             console.log('Database connected successfully');
             client.release();
+
             return true;
         } catch (err) {
             console.error('Failed to connect to database:', err.message);
-            return false;
-        }
-    }
-
-     async initializeTables() {
-        const transferEventsSchema = `
-            CREATE TABLE IF NOT EXISTS ${this.tableName} (
-                event_id VARCHAR(100) PRIMARY KEY,
-                station_id VARCHAR(100) NOT NULL,
-                amount DECIMAL(10, 2) NOT NULL,
-                status VARCHAR(100) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
-        await this.createTable(this.tableName, transferEventsSchema);
-    }
-
-    async createTable(tableName, schema) {
-        try {
-            await this.pool.query(schema);
-            console.log(`Table '${tableName}' created successfully`);
-            return true;
-        } catch (err) {
-            console.error(`Failed to create table '${tableName}':`, err.message);
             return false;
         }
     }
@@ -83,8 +33,16 @@ class PostgresqlDB extends DatabaseInterface {
         try {
             await client.query('BEGIN');
             
-            const keys = Object.keys(data);
-            const values = Object.values(data);
+            const allowedFields = ['event_id', 'station_id', 'amount', 'status', 'created_at'];
+            const filteredData = {};
+            for (const key of allowedFields) {
+            if (data[key] !== undefined) {
+                filteredData[key] = data[key];
+                }
+            }
+
+            const keys = Object.keys(filteredData);
+            const values = Object.values(filteredData);
             const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
             const query = `INSERT INTO ${this.tableName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`;
             
@@ -101,7 +59,7 @@ class PostgresqlDB extends DatabaseInterface {
             client.release();
         }
     }
-
+    // read, update and delete are practically not needed curently but they are just added as placeholder for crud operations in case we need them in the future
     async read(conditions = {}) {
         try {
             let query = `SELECT * FROM ${this.tableName}`;
