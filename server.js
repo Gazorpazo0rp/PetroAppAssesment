@@ -1,73 +1,46 @@
 const express = require('express');
-const database = require('./PostgresqlDB');
-const { validateTransferEventList, validateTransferEvent } = require('./utils');
+const PostgresqlDB = require('./PostgresqlDB');
+const createTransferEventsService = require('./transferEventsService');
+const createTransferEventsController = require('./transferEventsController');
+const createTransferEventsRoutes = require('./transferEventsRouter');
 
-const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+async function start() {
+  try {
+    const app = express();
+    app.use(express.json());
 
-// Initialize database
-app.listen(PORT, async () => {
-    try {
-        const connected = await database.connect();
-        
-        if (!connected) {
-            console.error('Failed to connect to database. Shutting down.');
-            process.exit(1);
-        }
-        
-        console.log(`Server is listening at http://localhost:${PORT}`);
-    } catch (err) {
-        console.error('Database initialization failed:', err.message);
-        process.exit(1);
+    console.log('Initializing database connection...');
+
+    // Create DB instance and connect
+    const database = new PostgresqlDB();
+
+    const connected = await database.connect();
+
+    if (!connected) {
+      console.error('Failed to connect to database. Shutting down.');
+      process.exit(1);
     }
-});
 
+    // Inject dependencies
+    const transferEventsService = createTransferEventsService(database);
+    const transferEventsController = createTransferEventsController(transferEventsService);
 
-app.post('/transfers', async (req, res) => {
-    try {
-        const validation = validateTransferEventList(req.body);
-        
-        if (!validation.isValid) {
-            return res.status(400).json({ error: validation.message });
-        }
-        
-        let inserted = 0;
-        let duplicates = 0;
-        let invalid = 0;
-        
-        for (const transferEvent of req.body) {
-            const eventValidation = validateTransferEvent(transferEvent);
-            
-            if (!eventValidation.isValid) {
-                invalid++;
-                continue;
-            }
-            
-            const result = await database.create(transferEvent);
-            if (result === 1) {
-                inserted++;
-            } else if (result === 0) {
-                duplicates++;
-            }
-        }
-        
-        res.status(201).json({
-            inserted,
-            duplicates,
-            invalid
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+    // Create router with controller
+    const transferRoutes = createTransferEventsRoutes(transferEventsController);
 
-app.get('/stations/:station_id/summary', async (req, res) => {
-    try {
-        const summary = await database.getStationSummary(req.params.station_id);
-        res.json(summary);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+    // Mount router
+    app.use(transferRoutes); // No prefix, routes already include full path
+
+    app.listen(PORT, () => {
+      console.log(`Server started and is listening at http://localhost:${PORT}`);
+    });
+
+  } catch (err) {
+    console.error('Database initialization failed:', err.message);
+    process.exit(1);
+  }
+}
+
+start();

@@ -5,7 +5,7 @@ const { Pool } = require('pg');
 
 class PostgresqlDB extends DatabaseInterface {
     constructor(tableName = 'TransferEvents') {
-        super(tableName);
+        super();
         this.pool = null;
         this.tableName = tableName;
     }
@@ -47,9 +47,6 @@ class PostgresqlDB extends DatabaseInterface {
             const client = await this.pool.connect();
             console.log('Database connected successfully');
             client.release();
-
-            // Initialize tables after connection
-            await this.initializeTables();
             return true;
         } catch (err) {
             console.error('Failed to connect to database:', err.message);
@@ -164,24 +161,23 @@ class PostgresqlDB extends DatabaseInterface {
     }
 
     async getStationSummary(stationId) {
-    try {
-        const query = `
-            SELECT 
-                $1 as station_id,
-                COALESCE(SUM(CASE WHEN status = 'approved' THEN amount ELSE 0 END), 0) as total_approved_amount,
-                COUNT(CASE WHEN status = 'approved' THEN 1 END) as events_count
-            FROM TransferEvents
-            WHERE station_id = $1
-        `;
-        
-        const result = await this.pool.query(query, [stationId]);
-        return result.rows[0];
-    } catch (err) {
-        console.error('getStationSummary operation failed:', err.message);
-        throw err;
+        try {
+            const query = `
+                SELECT 
+                    $1 as station_id,
+                    COALESCE(SUM(CASE WHEN status = 'approved' THEN amount ELSE 0 END), 0) as total_approved_amount,
+                    COUNT(CASE WHEN status = 'approved' THEN 1 END) as events_count
+                FROM TransferEvents
+                WHERE station_id = $1
+            `;
+            
+            const result = await this.pool.query(query, [stationId]);
+            return result.rows[0];
+        } catch (err) {
+            console.error('getStationSummary operation failed:', err.message);
+            throw err;
+        }
     }
 }
-}
 
-module.exports = new PostgresqlDB();
-
+module.exports = PostgresqlDB;
