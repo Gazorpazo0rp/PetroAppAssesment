@@ -79,20 +79,26 @@ class DatabaseInterface {
     }
 
     async create(data) {
+        const client = await this.pool.connect();
         try {
+            await client.query('BEGIN');
+            
             const keys = Object.keys(data);
             const values = Object.values(data);
             const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
             const query = `INSERT INTO ${this.tableName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`;
             
-            await this.pool.query(query, values);
+            await client.query(query, values);
+            await client.query('COMMIT');
             return 1;
         } catch (err) {
+            await client.query('ROLLBACK');
             if (err.code === '23505') {
                 return 0;
             }
-            console.error('Create operation failed:', err.message);
             throw err;
+        } finally {
+            client.release();
         }
     }
 

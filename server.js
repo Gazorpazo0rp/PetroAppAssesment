@@ -1,6 +1,6 @@
 const express = require('express');
 const DatabaseInterface = require('./database');
-const { validateTransferEventList } = require('./utils');
+const { validateTransferEventList, validateTransferEvent } = require('./utils');
 
 const app = express();
 const PORT = 3000;
@@ -36,8 +36,16 @@ app.post('/transfers', async (req, res) => {
         
         let inserted = 0;
         let duplicates = 0;
+        let invalid = 0;
         
         for (const transferEvent of req.body) {
+            const eventValidation = validateTransferEvent(transferEvent);
+            
+            if (!eventValidation.isValid) {
+                invalid++;
+                continue;
+            }
+            
             const result = await DatabaseInterface.create(transferEvent);
             if (result === 1) {
                 inserted++;
@@ -48,7 +56,8 @@ app.post('/transfers', async (req, res) => {
         
         res.status(201).json({
             inserted,
-            duplicates
+            duplicates,
+            invalid
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -63,4 +72,3 @@ app.get('/stations/:station_id/summary', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
