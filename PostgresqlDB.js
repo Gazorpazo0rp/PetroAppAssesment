@@ -1,8 +1,11 @@
 require('dotenv').config();
+const DatabaseInterface = require("./DatabaseInterface");
+
 const { Pool } = require('pg');
 
-class DatabaseInterface {
+class PostgresqlDB extends DatabaseInterface {
     constructor(tableName = 'TransferEvents') {
+        super(tableName);
         this.pool = null;
         this.tableName = tableName;
     }
@@ -180,5 +183,5 @@ class DatabaseInterface {
 }
 }
 
-module.exports = new DatabaseInterface();
+module.exports = new PostgresqlDB();
 

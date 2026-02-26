@@ -1,5 +1,5 @@
 const express = require('express');
-const DatabaseInterface = require('./database');
+const database = require('./PostgresqlDB');
 const { validateTransferEventList, validateTransferEvent } = require('./utils');
 
 const app = express();
@@ -10,8 +10,7 @@ app.use(express.json());
 // Initialize database
 app.listen(PORT, async () => {
     try {
-        await DatabaseInterface.createDatabase(process.env.DB_NAME);
-        const connected = await DatabaseInterface.connect();
+        const connected = await database.connect();
         
         if (!connected) {
             console.error('Failed to connect to database. Shutting down.');
@@ -46,7 +45,7 @@ app.post('/transfers', async (req, res) => {
                 continue;
             }
             
-            const result = await DatabaseInterface.create(transferEvent);
+            const result = await database.create(transferEvent);
             if (result === 1) {
                 inserted++;
             } else if (result === 0) {
@@ -66,7 +65,7 @@ app.post('/transfers', async (req, res) => {
 
 app.get('/stations/:station_id/summary', async (req, res) => {
     try {
-        const summary = await DatabaseInterface.getStationSummary(req.params.station_id);
+        const summary = await database.getStationSummary(req.params.station_id);
         res.json(summary);
     } catch (err) {
         res.status(500).json({ error: err.message });
