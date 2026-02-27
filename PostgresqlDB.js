@@ -28,6 +28,7 @@ class PostgresqlDB extends DatabaseInterface {
         }
     }
 
+    // create method is not used in the current implementation but it still exists in case we ened to try and compare single vs bulk insertion performance 
     async create(data) {
         const client = await this.pool.connect();
         try {
@@ -57,6 +58,59 @@ class PostgresqlDB extends DatabaseInterface {
             throw err;
         } finally {
             client.release();
+        }
+    }
+
+    async bulkCreate(events) {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const allowedFields = ['event_id', 'station_id', 'amount', 'status', 'created_at'];
+
+            const rows = [];
+            const values = [];
+            let placeholderIndex = 1;
+
+            for (const event of events) {
+                const filtered = {};
+
+                for (const key of allowedFields) {
+                    if (event[key] !== undefined) {
+                    filtered[key] = event[key];
+                    }
+                }
+
+                const rowPlaceholders = [];
+                for (const value of Object.values(filtered)) {
+                    values.push(value);
+                    rowPlaceholders.push(`$${placeholderIndex++}`);
+                }
+
+                rows.push(`(${rowPlaceholders.join(', ')})`);
+                }
+
+                const columns = allowedFields.filter(f => events[0][f] !== undefined);
+                const query = `
+                INSERT INTO ${this.tableName} (${columns.join(', ')})
+                VALUES ${rows.join(', ')}
+                ON CONFLICT (event_id) DO NOTHING
+                RETURNING event_id
+                `;
+
+                const result = await client.query(query, values);
+
+                await client.query('COMMIT');
+
+                return {
+                inserted: result.rowCount,
+                duplicates: events.length - result.rowCount
+                };
+            } catch (err) {
+                await client.query('ROLLBACK');
+                throw err;
+            } finally {
+                client.release();
         }
     }
     // read, update and delete are practically not needed curently but they are just added as placeholder for crud operations in case we need them in the future

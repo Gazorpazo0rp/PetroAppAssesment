@@ -3,25 +3,31 @@ const { validateTransferEvent } = require('./utils');
 const createTransferEventsService = (database) => ({
   
   async processTransfers(transferList) {
-    let inserted = 0;
-    let duplicates = 0;
     let invalid = 0;
+    const validEvents = [];
 
-    for (const transferEvent of transferList) {
-      const eventValidation = validateTransferEvent(transferEvent);
+    for (const event of transferList) {
+      const validation = validateTransferEvent(event);
 
-      if (!eventValidation.isValid) {
+      if (!validation.isValid) {
         invalid++;
         continue;
       }
 
-      const result = await database.create(transferEvent);
-
-      if (result === 1) inserted++;
-      else duplicates++;
+      validEvents.push(event);
     }
 
-    return { inserted, duplicates, invalid };
+    if (validEvents.length === 0) {
+      return { inserted: 0, duplicates: 0, invalid };
+    }
+
+    const result = await database.bulkCreate(validEvents);
+
+    return {
+      inserted: result.inserted,
+      duplicates: result.duplicates,
+      invalid
+    };
   },
 
   async getStationSummary(stationId) {
